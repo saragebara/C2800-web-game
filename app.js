@@ -15,6 +15,24 @@ class GameObject {
   draw(ctx) { //renders object on canvas
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
   }
+
+  rectFromGameObject() { //boundary coordinates for each object
+    return {
+      top: this.y,
+      left: this.x,
+      bottom: this.y + this.height,
+      right: this.x + this.width,
+    };
+  }
+}
+
+function intersectRect(r1, r2) {
+  return !( //checks overlap conditions
+    r2.left > r1.right ||
+    r2.right < r1.left ||
+    r2.top > r1.bottom ||
+    r2.bottom < r1.top
+  );
 }
 
 class Hero extends GameObject {
@@ -23,8 +41,29 @@ class Hero extends GameObject {
     this.width = 98;
     this.height = 75;
     this.type = "Hero";
-    this.speed = 5;
+    this.speed = { x: 0, y: 0 };
+    this.cooldown = 0;
   }
+
+  //laser firing
+  fire() {
+    gameObjects.push(new Laser(this.x + 45, this.y - 10));
+    this.cooldown = 500; //initial cooldown when game starts
+
+    let id = setInterval(() => {
+      if (this.cooldown > 0) {
+        this.cooldown -= 100;
+      } else {
+        clearInterval(id);
+      }
+    }, 200); //200 ms
+  }
+  
+  //can fire if there's no cooldown
+  canFire() {
+    return this.cooldown === 0;
+  }
+
 }
 
 class Enemy extends GameObject {
@@ -42,6 +81,46 @@ class Enemy extends GameObject {
       }
     }, 300);
   }
+}
+
+class Laser extends GameObject {
+  constructor(x, y) {
+    super(x, y);
+    this.width = 9;
+    this.height = 33;
+    this.type = 'Laser';
+    this.img = laserImg;
+    
+    let id = setInterval(() => { //upward movement
+      if (this.y > 0) {
+        this.y -= 15;
+      } else {
+        this.dead = true;
+        clearInterval(id);
+      }
+    }, 100);
+  }
+}
+
+//collision detection
+function updateGameObjects() {
+  const enemies = gameObjects.filter(go => go.type === 'Enemy');
+  const lasers = gameObjects.filter(go => go.type === "Laser");
+  
+  //tests every laser against every enemy for instersections
+  lasers.forEach((laser) => {
+    enemies.forEach((enemy) => {
+      if (intersectRect(laser.rectFromGameObject(), enemy.rectFromGameObject())) {
+        eventEmitter.emit(Messages.COLLISION_ENEMY_LASER, {//collision event when intersect detected
+          first: laser,
+          second: enemy,
+        });
+      }
+    });
+  });
+
+  //removing destroyed objects
+  gameObjects = gameObjects.filter(go => !go.dead);
 }
 
 function loadTexture(path) {
@@ -108,6 +187,8 @@ window.addEventListener("keyup", (evt) => {
     eventEmitter.emit(Messages.KEY_EVENT_LEFT);
   } else if (evt.key === "ArrowRight") {
     eventEmitter.emit(Messages.KEY_EVENT_RIGHT);
+  } else if(evt.keyCode === 32) {
+  eventEmitter.emit(Messages.KEY_EVENT_SPACE);
   }
 });
 
@@ -135,6 +216,9 @@ const Messages = { //message constants
   KEY_EVENT_DOWN: "KEY_EVENT_DOWN",
   KEY_EVENT_LEFT: "KEY_EVENT_LEFT",
   KEY_EVENT_RIGHT: "KEY_EVENT_RIGHT",
+  KEY_EVENT_SPACE: "KEY_EVENT_SPACE",
+  COLLISION_ENEMY_LASER: "COLLISION_ENEMY_LASER",
+  COLLISION_ENEMY_HERO: "COLLISION_ENEMY_HERO",
 };
 
 //images, canvas context, game state, event emitter
@@ -164,6 +248,19 @@ function initGame() {
   eventEmitter.on(Messages.KEY_EVENT_RIGHT, () => {
 		hero.x += 5;
 	});
+
+  //space = fire laser
+  eventEmitter.on(Messages.KEY_EVENT_SPACE, () => {
+  if (hero.canFire()) {
+    hero.fire();
+  }
+  });
+
+  //collision between enemy and laser removes them both
+  eventEmitter.on(Messages.COLLISION_ENEMY_LASER, (_, { first, second }) => {
+    first.dead = true; 
+    second.dead = true;
+  });
 }
 
 window.onload = async () => {
@@ -179,6 +276,7 @@ window.onload = async () => {
     ctx.clearRect(0,0, canvas.width, canvas.height);
     ctx.fillStyle = '#112545'; //changed to dark blue bg
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    updateGameObjects();
     drawGameObjects(ctx);
   }, 100);
 }
