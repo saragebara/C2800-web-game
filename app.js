@@ -288,7 +288,7 @@ function endGame(win) {
   //200 ms delay so that game renders correctly
   setTimeout(() => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "black"; //covers whole screen with loss/victory message
+    ctx.fillStyle = "#112545"; //covers whole screen with loss/victory message
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (win) {
       displayMessage(
@@ -311,7 +311,7 @@ function resetGame() {
     initGame();
     gameLoopId = setInterval(() => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "black";
+      ctx.fillStyle = "#112545";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       drawPoints();
       drawLife();
