@@ -347,19 +347,19 @@ function initGame() {
   createHero();
 
   eventEmitter.on(Messages.KEY_EVENT_UP, () => {
-    hero.y -= 5;
+    hero.y -= 20;
   });
 
   eventEmitter.on(Messages.KEY_EVENT_DOWN, () => {
-    hero.y += 5;
+    hero.y += 20;
   });
 
   eventEmitter.on(Messages.KEY_EVENT_LEFT, () => {
-    hero.x -= 5;
+    hero.x -= 20;
   });
 
   eventEmitter.on(Messages.KEY_EVENT_RIGHT, () => {
-		hero.x += 5;
+		hero.x += 20;
 	});
 
   //space = fire laser
