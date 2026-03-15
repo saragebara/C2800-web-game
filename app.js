@@ -1,3 +1,5 @@
+let gameLoopId;
+
 //base class for hero/enemy
 class GameObject {
   constructor(x, y) {
@@ -208,6 +210,15 @@ function drawGameObjects(ctx) {
   gameObjects.forEach(go => go.draw(ctx));
 }
 
+//end condition checks
+function isHeroDead() {
+  return hero.life <= 0;
+}
+function isEnemiesDead() {
+  const enemies = gameObjects.filter((go) => go.type === "Enemy" && !go.dead);
+  return enemies.length === 0;
+}
+
 const onKeyDown = function (e) {
   console.log(e.keyCode);
   switch (e.keyCode) {
@@ -236,6 +247,8 @@ window.addEventListener("keyup", (evt) => {
     eventEmitter.emit(Messages.KEY_EVENT_RIGHT);
   } else if(evt.keyCode === 32) {
   eventEmitter.emit(Messages.KEY_EVENT_SPACE);
+  } else if(evt.key === "Enter") {
+  eventEmitter.emit(Messages.KEY_EVENT_ENTER);
   }
 });
 
@@ -256,6 +269,56 @@ class EventEmitter {
 			this.listeners[message].forEach((l) => l(message, payload));
 		}
 	}
+
+  clear() {
+    this.listeners = {};
+  }
+
+}
+
+function displayMessage(message, color = "red") {
+  ctx.font = "30px Arial";
+  ctx.fillStyle = color;
+  ctx.textAlign = "center";
+  ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+}
+
+function endGame(win) {
+  clearInterval(gameLoopId);
+  //200 ms delay so that game renders correctly
+  setTimeout(() => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "black"; //covers whole screen with loss/victory message
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (win) {
+      displayMessage(
+        "Victory!!! Pew Pew... - Press [Enter] to start a new game Captain Pew Pew",
+        "green"
+      );
+    } else {
+      displayMessage(
+        "You died !!! Press [Enter] to start a new game Captain Pew Pew"
+      );
+    }
+  }, 200)  
+}
+
+//clean reset of game
+function resetGame() {
+  if (gameLoopId) {
+    clearInterval(gameLoopId);
+    eventEmitter.clear();
+    initGame();
+    gameLoopId = setInterval(() => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      drawPoints();
+      drawLife();
+      updateGameObjects();
+      drawGameObjects(ctx);
+    }, 100);
+  }
 }
 
 const Messages = { //message constants
@@ -266,6 +329,9 @@ const Messages = { //message constants
   KEY_EVENT_SPACE: "KEY_EVENT_SPACE",
   COLLISION_ENEMY_LASER: "COLLISION_ENEMY_LASER",
   COLLISION_ENEMY_HERO: "COLLISION_ENEMY_HERO",
+  GAME_END_LOSS: "GAME_END_LOSS",
+  GAME_END_WIN: "GAME_END_WIN",
+  KEY_EVENT_ENTER: "KEY_EVENT_ENTER",
 };
 
 //images, canvas context, game state, event emitter
@@ -308,12 +374,35 @@ function initGame() {
     first.dead = true; 
     second.dead = true;
     hero.incrementPoints();
+
+    if(isEnemiesDead()){
+      eventEmitter.emit(Messages.GAME_END_WIN);
+    }
   });
 
   //collision between enemy and hero decreases lives and removes enemy
   eventEmitter.on(Messages.COLLISION_ENEMY_HERO, (_, { enemy }) => {
     enemy.dead = true;
     hero.decrementLife();
+    if (isHeroDead())  {
+      eventEmitter.emit(Messages.GAME_END_LOSS);
+      return; //loss right befoore victory
+    }
+    if (isEnemiesDead()) {
+      eventEmitter.emit(Messages.GAME_END_WIN);
+    }
+  });
+
+  eventEmitter.on(Messages.GAME_END_WIN, () => {
+      endGame(true);
+  });
+    
+  eventEmitter.on(Messages.GAME_END_LOSS, () => {
+    endGame(false);
+  });
+
+  eventEmitter.on(Messages.KEY_EVENT_ENTER, () => {
+    resetGame();
   });
 }
 
@@ -327,7 +416,7 @@ window.onload = async () => {
   lifeImg = await loadTexture('assets/life.png');
 
   initGame();
-  const gameLoopId = setInterval(()=> {
+  gameLoopId = setInterval(()=> {
     ctx.clearRect(0,0, canvas.width, canvas.height);
     ctx.fillStyle = '#112545'; //changed to dark blue bg
     ctx.fillRect(0, 0, canvas.width, canvas.height);
